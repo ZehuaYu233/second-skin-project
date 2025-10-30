@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>The Tension of the Second Skin | Zehua Yu</title>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&family=Inter:wght@300;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+          "three/addons/postprocessing/EffectComposer.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js",
+          "three/addons/postprocessing/RenderPass.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/RenderPass.js",
+          "three/addons/postprocessing/FilmPass.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/FilmPass.js",
+          "three/addons/postprocessing/UnrealBloomPass.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js",
+          "three/addons/postprocessing/SAOPass.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/SAOPass.js",
+          "three/addons/shaders/RGBShiftShader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/shaders/RGBShiftShader.js",
+          "three/addons/postprocessing/ShaderPass.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js"
+        }
+      }
+    </script>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Inter", sans-serif;
+        background-color: #111;
+        color: #fff;
+        overflow: hidden;
+        height: 100vh;
+      }
+      #viewer-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        cursor: none;
+      }
+
+      /* --- UI: 引导与启动屏幕 --- */
+      #intro-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.95);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        transition: opacity 1s ease-out;
+      }
+      .intro-content {
+        text-align: center;
+        max-width: 650px;
+        padding: 20px;
+      }
+      .intro-content h1 {
+        font-size: 2.5em;
+        font-weight: 600;
+        margin-bottom: 15px;
+      }
+      .intro-content p {
+        font-size: 1.1em;
+        font-weight: 300;
+        line-height: 1.6;
+        margin-bottom: 25px;
+      }
+      #start-button {
+        padding: 10px 25px;
+        font-size: 1.1em;
+        cursor: pointer;
+        background-color: #fff;
+        color: #000;
+        border: none;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+      }
+      #start-button:disabled {
+        background-color: #666;
+        color: #aaa;
+        cursor: default;
+      }
+
+      /* --- UI: 叙事文本层 --- */
+      #narrative-container {
+        position: absolute;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 30;
+        pointer-events: none;
+        text-align: center;
+        width: 90%;
+        max-width: 800px;
+      }
+      .narrative-text {
+        font-family: "Lora", serif;
+        font-size: 1.8em;
+        font-style: italic;
+        opacity: 0;
+        transition: opacity 2s ease-in-out;
+        position: absolute;
+        width: 100%;
+        left: 0;
+        bottom: 0;
+        text-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
+      }
+
+      /* --- UI: 开发与调试控制 --- */
+      #dev-controls {
+        padding: 10px;
+        background-color: rgba(0, 0, 0, 0.5);
+        text-align: center;
+        z-index: 101;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        box-sizing: border-box;
+        display: block;
+      }
+
+      /* --- UI: Embodied Feedback View (PiP) --- */
+      #embodied-feedback-container {
+        position: absolute;
+        bottom: 40px;
+        left: 40px;
+        width: 240px; /* Size suitable for PiP (4:3 aspect ratio) */
+        height: 180px;
+        z-index: 50; /* Above the main scene */
+        background-color: rgba(0, 0, 0, 0.5);
+        display: block; /* Visible by default for portfolio */
+        overflow: hidden;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      #webcam-display {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1); /* Mirrored view for intuitive interaction */
+        /* Smooth transition for CSS filters applied via JS */
+        transition: filter 0.5s ease-out;
+      }
+
+      #pose-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1); /* Mirrored view for skeleton alignment */
+      }
+
+      /* Noise/Scanline Overlay (Aesthetic enhancement) */
+      #feedback-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+        /* Simulating digital scanlines using a repeating gradient */
+        background-image: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.4) 0px,
+          rgba(0, 0, 0, 0.4) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        opacity: 0.5; /* Default opacity, controlled by JS */
+        transition: opacity 0.5s ease-out;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewer-container">
+      <div id="narrative-container">
+        <div id="text-shelter" class="narrative-text">
+          ...a soft embrace... the second skin breathes...
+        </div>
+        <div id="text-pressure" class="narrative-text">
+          ...constriction... digitized weight... structure yields...
+        </div>
+      </div>
+
+      <div id="embodied-feedback-container">
+        <video id="webcam-display" autoplay muted playsinline></video>
+        <canvas id="pose-canvas"></canvas>
+        <div id="feedback-overlay"></div>
+      </div>
+    </div>
+
+    <div id="intro-overlay">
+      <div class="intro-content">
+        <h1>The Tension of the Second Skin</h1>
+        <p>
+          An exploration of embodied tension. Requires camera and audio access.
+          <br /><strong>Crouch/Stand</strong> to change tension.
+          <strong>Move Left/Right</strong> to orbit.
+          <strong>Move Closer/Further</strong> to zoom.
+        </p>
+        <button id="start-button" disabled>Initializing...</button>
+      </div>
+    </div>
+
+    <div id="dev-controls">
+      <label for="model-input">Load Local Model (.glb): </label>
+      <input type="file" id="model-input" accept=".glb,.gltf" />
+      <span id="tension-display" style="margin-left: 15px; margin-right: 15px"
+        >Tension: 0.50</span
+      >
+      <button onclick="toggleFeedbackView()">Toggle Feedback View</button>
+    </div>
+
+    <video
+      id="webcam-data-source"
+      autoplay
+      muted
+      playsinline
+      width="640"
+      height="480"
+      style="display: none"
+    ></video>
+
+    <script type="module">
+      // --- 导入模块 ---
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+      import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+      import { FilmPass } from "three/addons/postprocessing/FilmPass.js";
+      import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+      import { SAOPass } from "three/addons/postprocessing/SAOPass.js";
+      import { RGBShiftShader } from "three/addons/shaders/RGBShiftShader.js";
+      import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+
+      // --- 全局变量定义 ---
+      let scene,
+        camera,
+        renderer,
+        controls,
+        loader,
+        composer,
+        filmPass,
+        bloomPass,
+        saoPass,
+        rgbShiftPass;
+      let currentModel = null;
+      const viewerContainer = document.getElementById("viewer-container");
+
+      // Pose Detection and Feedback View variables
+      let detector, videoData, videoDisplay, poseCanvas, poseCtx;
+      let feedbackContainer, feedbackOverlay; // Elements for PiP aesthetics
+
+      const SCORE_THRESHOLD = 0.5;
+      let globalTension = 0.5;
+      const tensionDisplay = document.getElementById("tension-display");
+
+      // 音频系统变量
+      let audioListener, soundShelter, soundPressure;
+
+      // 具身视角控制
+      const embodiedCameraState = {
+        targetRotationX: 0,
+        targetDistance: 5,
+        currentRotationX: 0,
+        currentDistance: 5,
+      };
+
+      // 全局 Uniforms
+      const globalShaderUniforms = {
+        uTension: { value: 0.5 },
+        uTime: { value: 0.0 },
+      };
+
+      let isPoseReady = false;
+      let isModelLoaded = false;
+      let isAudioReady = false;
+      let interactionStarted = false;
+      const startButton = document.getElementById("start-button");
+      const introOverlay = document.getElementById("intro-overlay");
+      const textShelter = document.getElementById("text-shelter");
+      const textPressure = document.getElementById("text-pressure");
+
+      // =========================================
+      // 视觉反馈定义与更新
+      // =========================================
+
+      let ambientLight, keyLight, fillLight, rimLight;
+
+      // Colors definitions aligned with project themes
+      const COLOR_RELAXED_LIGHT = new THREE.Color(0xffebcd); // Warm Amber (Shelter)
+      const COLOR_TENSE_LIGHT = new THREE.Color(0xa6c7ff); // Cold Blue (Pressure)
+      const COLOR_RELAXED_BG = new THREE.Color(0x1a1a15);
+      const COLOR_TENSE_BG = new THREE.Color(0x0a0f1a);
+
+      // Skeleton color mirroring the scene lighting
+      let currentSkeletonColor = new THREE.Color();
+
+      function updateVisualFeedback() {
+        if (
+          !filmPass ||
+          !bloomPass ||
+          !saoPass ||
+          !rgbShiftPass ||
+          !ambientLight ||
+          !keyLight ||
+          !scene
+        ) {
+          return;
+        }
+
+        // 1. 光照与背景
+        ambientLight.intensity = 2.5 - globalTension * 1.5;
+        keyLight.color.lerpColors(
+          COLOR_RELAXED_LIGHT,
+          COLOR_TENSE_LIGHT,
+          globalTension
+        );
+
+        if (
+          scene.background &&
+          typeof scene.background.lerpColors === "function"
+        ) {
+          scene.background.lerpColors(
+            COLOR_RELAXED_BG,
+            COLOR_TENSE_BG,
+            globalTension
+          );
+        }
+
+        // 2. 更新着色器 Uniforms
+        globalShaderUniforms.uTension.value = globalTension;
+
+        // 3. 后期处理：噪点
+        const noiseIntensity = 0.05 + globalTension * 0.75;
+        if (filmPass.uniforms["nIntensity"]) {
+          filmPass.uniforms["nIntensity"].value = noiseIntensity;
+        }
+
+        // 4. 后期处理：辉光
+        const bloomIntensity = 1.1 - globalTension * 0.9;
+        bloomPass.strength = bloomIntensity;
+
+        // 5. 环境光遮蔽 (SAO)
+        saoPass.params.saoIntensity = 0.01 + globalTension * 0.01;
+
+        // 6. 后期处理：RGB Shift
+        const shiftAmount = Math.pow(globalTension, 2.0) * 0.01;
+        rgbShiftPass.uniforms["amount"].value = shiftAmount;
+
+        // 7. Update Embodied Feedback Aesthetics
+        updateEmbodiedFeedbackAesthetics();
+      }
+
+      // >>>>> 新增：具身反馈视图美学更新 <<<<<
+      function updateEmbodiedFeedbackAesthetics() {
+        if (!feedbackContainer || !feedbackOverlay || !videoDisplay) return;
+
+        // 1. Update Skeleton Color (Interpolate between the main light colors)
+        currentSkeletonColor.lerpColors(
+          COLOR_RELAXED_LIGHT,
+          COLOR_TENSE_LIGHT,
+          globalTension
+        );
+
+        // 2. Color Grading (Using CSS filters on the videoDisplay element)
+        // Goal: Moody, high contrast, and desaturated, especially when tense.
+
+        // Saturation: 60% (Relaxed, subtle warmth) -> 0% (Tense, stark grayscale)
+        const saturate = THREE.MathUtils.lerp(0.6, 0.0, globalTension) * 100;
+        // Brightness: 110% (Relaxed) -> 90% (Tense)
+        const brightness = THREE.MathUtils.lerp(1.1, 0.9, globalTension) * 100;
+        // Contrast: 110% (Relaxed) -> 150% (Tense)
+        const contrast = THREE.MathUtils.lerp(1.1, 1.5, globalTension) * 100;
+
+        // Apply CSS filters to the video element (so the skeleton overlay remains bright)
+        videoDisplay.style.filter = `saturate(${saturate}%) brightness(${brightness}%) contrast(${contrast}%)`;
+
+        // 3. Noise/Scanline Overlay Opacity
+        // Tension 0.0: 0.3 (Subtle texture)
+        // Tension 1.0: 0.8 (Strong digital interference)
+        const overlayOpacity = THREE.MathUtils.lerp(0.3, 0.8, globalTension);
+        feedbackOverlay.style.opacity = overlayOpacity;
+      }
+
+      // =========================================
+      // 听觉反馈 (保持不变)
+      // =========================================
+
+      function updateAudioFeedback() {
+        if (!isAudioReady || !soundShelter || !soundPressure) return;
+
+        if (soundShelter.buffer && soundShelter.isPlaying) {
+          soundShelter.setVolume(1.0 - globalTension);
+        }
+
+        if (soundPressure.buffer && soundPressure.isPlaying) {
+          soundPressure.setVolume(globalTension);
+        }
+      }
+
+      // =========================================
+      // 叙事反馈 & 姿态分析 (保持不变)
+      // =========================================
+
+      function updateNarrative(tension) {
+        if (!interactionStarted) return;
+        const THRESHOLD_SHELTER = 0.3;
+        const THRESHOLD_PRESSURE = 0.7;
+        const opacityShelter = THREE.MathUtils.inverseLerp(
+          THRESHOLD_SHELTER,
+          0.0,
+          tension
+        );
+        textShelter.style.opacity = THREE.MathUtils.clamp(
+          opacityShelter,
+          0.0,
+          1.0
+        );
+        const opacityPressure = THREE.MathUtils.inverseLerp(
+          THRESHOLD_PRESSURE,
+          1.0,
+          tension
+        );
+        textPressure.style.opacity = THREE.MathUtils.clamp(
+          opacityPressure,
+          0.0,
+          1.0
+        );
+      }
+
+      function analyzePosture(keypoints) {
+        const KP = {
+          LEFT_SHOULDER: 5,
+          RIGHT_SHOULDER: 6,
+          LEFT_HIP: 11,
+          RIGHT_HIP: 12,
+        };
+
+        const leftShoulder = keypoints[KP.LEFT_SHOULDER];
+        const rightShoulder = keypoints[KP.RIGHT_SHOULDER];
+        const leftHip = keypoints[KP.LEFT_HIP];
+        const rightHip = keypoints[KP.RIGHT_HIP];
+
+        if (
+          leftShoulder.score < SCORE_THRESHOLD ||
+          rightShoulder.score < SCORE_THRESHOLD ||
+          leftHip.score < SCORE_THRESHOLD ||
+          rightHip.score < SCORE_THRESHOLD
+        ) {
+          return null;
+        }
+
+        const midTorsoX =
+          (leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4;
+        const normalizedX = midTorsoX / 320.0 - 1.0;
+
+        const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+
+        const midShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+        const midHipY = (leftHip.y + rightHip.y) / 2;
+        const torsoHeight = Math.abs(midHipY - midShoulderY);
+
+        if (shoulderWidth < 10) return null;
+
+        const ratio = torsoHeight / shoulderWidth;
+
+        return {
+          normalizedX: normalizedX,
+          shoulderWidth: shoulderWidth,
+          torsoRatio: ratio,
+        };
+      }
+
+      function processPostureData(data) {
+        if (!data) return;
+
+        // 1. 更新张力指数
+        const MIN_RATIO = 1.0;
+        const MAX_RATIO = 1.8;
+        const TENSION_SMOOTHING = 0.08;
+
+        let normalizedRelaxation = THREE.MathUtils.inverseLerp(
+          MIN_RATIO,
+          MAX_RATIO,
+          data.torsoRatio
+        );
+        normalizedRelaxation = THREE.MathUtils.clamp(
+          normalizedRelaxation,
+          0.0,
+          1.0
+        );
+        const tension = 1.0 - normalizedRelaxation;
+
+        globalTension = THREE.MathUtils.lerp(
+          globalTension,
+          tension,
+          TENSION_SMOOTHING
+        );
+
+        // 2. 更新具身视角控制目标
+        const ROTATION_SENSITIVITY = 1.2;
+        const DISTANCE_MIN_PX = 100;
+        const DISTANCE_MAX_PX = 280;
+        const CAMERA_DIST_MIN_UNITS = 3.5;
+        const CAMERA_DIST_MAX_UNITS = 6.5;
+
+        const targetRot = -data.normalizedX * ROTATION_SENSITIVITY;
+        embodiedCameraState.targetRotationX = targetRot;
+
+        let normalizedDistance = THREE.MathUtils.inverseLerp(
+          DISTANCE_MIN_PX,
+          DISTANCE_MAX_PX,
+          data.shoulderWidth
+        );
+        normalizedDistance = THREE.MathUtils.clamp(
+          normalizedDistance,
+          0.0,
+          1.0
+        );
+        const targetDist =
+          CAMERA_DIST_MAX_UNITS +
+          (CAMERA_DIST_MIN_UNITS - CAMERA_DIST_MAX_UNITS) * normalizedDistance;
+        embodiedCameraState.targetDistance = targetDist;
+      }
+
+      // =========================================
+      // 姿态检测模块 (更新为双视频源)
+      // =========================================
+
+      async function initPoseDetection() {
+        updateStatus("Requesting Camera Access...");
+        try {
+          // Initialize aesthetic elements first
+          feedbackContainer = document.getElementById(
+            "embodied-feedback-container"
+          );
+          feedbackOverlay = document.getElementById("feedback-overlay");
+
+          await setupCamera();
+          // Video playing is handled in setupCamera
+          updateStatus("Loading Pose Model...");
+          await loadPoseModel();
+          poseCanvas = document.getElementById("pose-canvas");
+          poseCtx = poseCanvas.getContext("2d");
+
+          onWindowResize();
+          isPoseReady = true;
+          checkReadiness();
+          detectPosesLoop();
+        } catch (e) {
+          updateStatus("Initialization Failed: " + e.message);
+          console.error(e);
+        }
+      }
+
+      // >>>>> 更新：设置双视频源 <<<<<
+      async function setupCamera() {
+        // videoData is used for the fixed-resolution ML processing
+        videoData = document.getElementById("webcam-data-source");
+        // videoDisplay is used for the stylized PiP view
+        videoDisplay = document.getElementById("webcam-display");
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("getUserMedia API not available");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          // Request a resolution suitable for ML processing (640x480)
+          video: { facingMode: "user", width: 640, height: 480 },
+        });
+
+        // Assign the same stream to both video elements
+        videoData.srcObject = stream;
+        videoDisplay.srcObject = stream;
+
+        // Wait for the data source video to load metadata
+        return new Promise((resolve) => {
+          videoData.onloadedmetadata = () => {
+            // Ensure both videos start playing
+            videoData.play();
+            videoDisplay.play();
+            resolve(videoData);
+          };
+        });
+      }
+
+      async function loadPoseModel() {
+        const detectorConfig = {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+        };
+        detector = await poseDetection.createDetector(
+          poseDetection.SupportedModels.MoveNet,
+          detectorConfig
+        );
+      }
+
+      async function detectPosesLoop() {
+        // Use videoData (the hidden element) for detection
+        if (detector && videoData.readyState === 4 && interactionStarted) {
+          try {
+            const poses = await detector.estimatePoses(videoData, {
+              maxPoses: 1,
+              flipHorizontal: false, // Mirroring is handled by CSS transform
+            });
+
+            if (poses.length > 0) {
+              const keypoints = poses[0].keypoints;
+
+              const postureData = analyzePosture(keypoints);
+              processPostureData(postureData);
+
+              updateTensionDisplay(globalTension);
+              // Aesthetics are updated in the main animate loop via updateVisualFeedback
+
+              // 绘制反馈视图
+              if (poseCanvas && poseCtx) {
+                poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+
+                // Only draw if the container is visible
+                if (feedbackContainer.style.display !== "none") {
+                  // Use the stylized drawing function
+                  drawEmbodiedSkeleton(keypoints);
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Pose detection error:", error);
+          }
+        }
+        requestAnimationFrame(detectPosesLoop);
+      }
+
+      function updateTensionDisplay(tension) {
+        tensionDisplay.textContent = `Tension: ${tension.toFixed(2)}`;
+        // Use the interpolated color for the text as well
+        tensionDisplay.style.color = currentSkeletonColor.getStyle();
+      }
+
+      // >>>>> 更新：艺术化骨骼绘制 <<<<<
+      function drawEmbodiedSkeleton(keypoints) {
+        const adjacentPairs = poseDetection.util.getAdjacentPairs(
+          poseDetection.SupportedModels.MoveNet
+        );
+
+        // Use the dynamically calculated color
+        const colorString = currentSkeletonColor.getStyle();
+
+        poseCtx.strokeStyle = colorString;
+        poseCtx.fillStyle = colorString;
+        poseCtx.lineWidth = 1.5; // Thin lines
+
+        // Add a subtle glow effect using canvas shadow
+        poseCtx.shadowColor = colorString;
+        // Glow intensifies slightly with tension
+        poseCtx.shadowBlur = 5 + globalTension * 5;
+
+        // Scale factors based on the input video resolution (640x480) and the canvas display size
+        const scaleX = poseCanvas.width / 640;
+        const scaleY = poseCanvas.height / 480;
+
+        // Draw Lines
+        for (const [i, j] of adjacentPairs) {
+          const kp1 = keypoints[i];
+          const kp2 = keypoints[j];
+          if (kp1.score > SCORE_THRESHOLD && kp2.score > SCORE_THRESHOLD) {
+            poseCtx.beginPath();
+            poseCtx.moveTo(kp1.x * scaleX, kp1.y * scaleY);
+            poseCtx.lineTo(kp2.x * scaleX, kp2.y * scaleY);
+            poseCtx.stroke();
+          }
+        }
+
+        // Draw Points (Nodes)
+        for (const keypoint of keypoints) {
+          if (keypoint.score > SCORE_THRESHOLD) {
+            poseCtx.beginPath();
+            poseCtx.arc(
+              keypoint.x * scaleX,
+              keypoint.y * scaleY,
+              3,
+              0,
+              2 * Math.PI
+            );
+            poseCtx.fill();
+          }
+        }
+
+        // Reset shadow settings
+        poseCtx.shadowBlur = 0;
+      }
+
+      // =========================================
+      // 3D 场景模块 (保持不变)
+      // =========================================
+
+      function initThreeJS() {
+        // 1. 场景与渲染器
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        viewerContainer.appendChild(renderer.domElement);
+
+        // 2. 摄像机与控制器
+        camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        camera.position.set(0, 1.5, embodiedCameraState.currentDistance);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1.25, 0);
+
+        // 禁用鼠标控制
+        controls.enableDamping = false;
+        controls.enableRotate = false;
+        controls.enableZoom = false;
+        controls.enablePan = false;
+
+        controls.update();
+
+        // 3. 光照
+        setupLighting();
+
+        // 4. 后期处理
+        setupPostProcessing();
+
+        // 5. 音频初始化
+        initAudio();
+
+        // 6. 加载器与事件
+        loader = new GLTFLoader();
+        document
+          .getElementById("model-input")
+          .addEventListener("change", handleFileUpload, false);
+        window.addEventListener("resize", onWindowResize, false);
+
+        animate();
+      }
+
+      function setupLighting() {
+        ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        scene.add(ambientLight);
+        keyLight = new THREE.DirectionalLight(0xffffff, 9.0);
+        keyLight.position.set(5, 10, 7.5);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        scene.add(keyLight);
+        fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        fillLight.position.set(-10, 5, 5);
+        scene.add(fillLight);
+        rimLight = new THREE.DirectionalLight(0xffffff, 10.0);
+        rimLight.position.set(0, 5, -10);
+        scene.add(rimLight);
+      }
+
+      function setupPostProcessing() {
+        const renderScene = new RenderPass(scene, camera);
+
+        // 1. SAO Pass
+        saoPass = new SAOPass(
+          scene,
+          camera,
+          false,
+          true,
+          new THREE.Vector2(2048, 2048)
+        );
+        saoPass.params.saoBias = 0.5;
+        saoPass.params.saoIntensity = 0.015;
+        saoPass.params.saoScale = 5;
+        saoPass.params.saoKernelRadius = 50;
+        saoPass.params.saoBlur = true;
+
+        // 2. Bloom Pass
+        bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight),
+          0.5,
+          0.4,
+          0.85
+        );
+
+        // 3. Film Pass
+        filmPass = new FilmPass(0.1, 0.1, 648, false);
+
+        // 4. RGB Shift Pass
+        rgbShiftPass = new ShaderPass(RGBShiftShader);
+        rgbShiftPass.uniforms["amount"].value = 0.0;
+
+        // 5. Composer
+        composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(saoPass);
+        composer.addPass(bloomPass);
+        composer.addPass(rgbShiftPass);
+        composer.addPass(filmPass);
+      }
+
+      function initAudio() {
+        // Basic check for Web Audio API support
+        if (
+          typeof window.AudioContext === "undefined" &&
+          typeof window.webkitAudioContext === "undefined"
+        ) {
+          console.warn(
+            "Web Audio API not supported. Proceeding without audio."
+          );
+          isAudioReady = true;
+          checkReadiness();
+          return;
+        }
+
+        try {
+          audioListener = new THREE.AudioListener();
+          camera.add(audioListener);
+        } catch (e) {
+          console.error("Failed to initialize AudioListener:", e);
+          isAudioReady = true;
+          checkReadiness();
+          return;
+        }
+
+        const audioLoader = new THREE.AudioLoader();
+
+        soundShelter = new THREE.Audio(audioListener);
+        soundPressure = new THREE.Audio(audioListener);
+
+        let shelterProcessed = false;
+        let pressureProcessed = false;
+
+        const checkBothProcessed = () => {
+          if (shelterProcessed && pressureProcessed) {
+            isAudioReady = true;
+            checkReadiness();
+          }
+        };
+
+        // Note: Ensure 'ambient_shelter.mp3' and 'ambient_pressure.mp3' exist.
+        // (Error handling remains the same)
+        audioLoader.load(
+          "ambient_shelter.mp3",
+          function (buffer) {
+            soundShelter.setBuffer(buffer);
+            soundShelter.setLoop(true);
+            soundShelter.setVolume(0.5);
+            shelterProcessed = true;
+            checkBothProcessed();
+          },
+          undefined,
+          () => {
+            console.warn("Failed to load ambient_shelter.mp3.");
+            shelterProcessed = true;
+            checkBothProcessed();
+          }
+        );
+
+        audioLoader.load(
+          "ambient_pressure.mp3",
+          function (buffer) {
+            soundPressure.setBuffer(buffer);
+            soundPressure.setLoop(true);
+            soundPressure.setVolume(0.5);
+            pressureProcessed = true;
+            checkBothProcessed();
+          },
+          undefined,
+          () => {
+            console.warn("Failed to load ambient_pressure.mp3.");
+            pressureProcessed = true;
+            checkBothProcessed();
+          }
+        );
+      }
+
+      function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        loadGLBModel(url);
+      }
+
+      function loadGLBModel(url) {
+        updateStatus("Loading 3D Artifact...");
+
+        if (currentModel) {
+          scene.remove(currentModel);
+        }
+
+        loader.load(
+          url,
+          function (gltf) {
+            currentModel = gltf.scene;
+            currentModel.traverse(function (child) {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Ensure Vertex Normals
+                if (!child.geometry.attributes.normal) {
+                  child.geometry.computeVertexNormals();
+                }
+
+                // --- 材质标准化处理 ---
+                let material = child.material;
+
+                // Convert if not Standard Material or explicitly Unlit
+                if (
+                  !material.isMeshStandardMaterial ||
+                  (material.extensions &&
+                    material.extensions.KHR_materials_unlit)
+                ) {
+                  const newMaterial = new THREE.MeshStandardMaterial();
+
+                  // Robust Material Property Copying
+                  if (material.color) newMaterial.color.copy(material.color);
+                  newMaterial.map = material.map || null;
+                  newMaterial.transparent = material.transparent || false;
+                  newMaterial.opacity =
+                    material.opacity !== undefined ? material.opacity : 1.0;
+                  newMaterial.side = material.side;
+                  newMaterial.alphaTest = material.alphaTest || 0;
+
+                  // Copy animation properties
+                  if (material.skinning) newMaterial.skinning = true;
+                  if (material.morphTargets) newMaterial.morphTargets = true;
+                  if (material.morphNormals) newMaterial.morphNormals = true;
+
+                  // Set desired physical properties
+                  newMaterial.metalness = 0.0;
+                  newMaterial.roughness = 0.9;
+
+                  material = newMaterial;
+                  child.material = material;
+                }
+
+                // --- 顶点位移着色器注入 ---
+                if (material.isMeshStandardMaterial) {
+                  // 使用 onBeforeCompile 注入 GLSL 代码
+                  material.onBeforeCompile = (shader) => {
+                    // 1. 关联 Uniforms
+                    shader.uniforms.uTension = globalShaderUniforms.uTension;
+                    shader.uniforms.uTime = globalShaderUniforms.uTime;
+
+                    // 2. 注入 GLSL 声明
+                    shader.vertexShader = shader.vertexShader.replace(
+                      "#include <common>",
+                      `
+                        #include <common>
+                        uniform float uTension;
+                        uniform float uTime;
+                      `
+                    );
+
+                    // 3. 注入 GLSL 逻辑
+                    shader.vertexShader = shader.vertexShader.replace(
+                      "#include <begin_vertex>",
+                      `
+                        #include <begin_vertex>
+
+                        // --- Injected Displacement Logic ---
+                        float displacementStrength = pow(uTension, 3.0) * 0.15;
+                        float displacement = sin(position.y * 5.0 + uTime * 2.0) * sin(position.x * 3.0 + uTime * 0.5) * cos(position.z * 3.0);
+                        transformed += normalize(normal) * displacement * displacementStrength;
+                        // --- End of Injected Logic ---
+                      `
+                    );
+                  };
+
+                  // Ensure Three.js compiles a unique shader
+                  material.customProgramCacheKey = function () {
+                    return "tension_displacement_shader_v1";
+                  };
+
+                  material.needsUpdate = true;
+                }
+              }
+            });
+            centerAndScaleModel(currentModel);
+            scene.add(currentModel);
+            if (url.startsWith("blob:")) {
+              URL.revokeObjectURL(url);
+            }
+            isModelLoaded = true;
+            checkReadiness();
+          },
+          undefined,
+          function (error) {
+            console.error(error);
+            updateStatus("Model Loading Failed.");
+          }
+        );
+      }
+
+      function centerAndScaleModel(model) {
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const targetHeight = 2.5;
+
+        if (size.y < 0.001) {
+          console.warn(
+            "Model has negligible height, skipping height-based scaling."
+          );
+          return;
+        }
+
+        const scale = targetHeight / size.y;
+        model.scale.multiplyScalar(scale);
+
+        const newBox = new THREE.Box3().setFromObject(model);
+        const newCenter = newBox.getCenter(new THREE.Vector3());
+        model.position.x += model.position.x - newCenter.x;
+        model.position.y += model.position.y - newCenter.y + targetHeight / 2;
+        model.position.z += model.position.z - newCenter.z;
+        controls.target.set(0, targetHeight / 2, 0);
+        controls.update();
+      }
+
+      // >>>>> 更新：确保 Canvas 尺寸正确设置 <<<<<
+      function onWindowResize() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        if (camera && renderer) {
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+          renderer.setSize(width, height);
+        }
+        if (composer) {
+          composer.setSize(width, height);
+        }
+
+        // Ensure the pose canvas matches its container size for correct rendering
+        if (poseCanvas && poseCtx && feedbackContainer) {
+          setTimeout(() => {
+            // Use the clientWidth/Height of the container
+            if (
+              feedbackContainer.clientWidth > 0 &&
+              feedbackContainer.clientHeight > 0
+            ) {
+              // Set the rendering resolution of the canvas
+              poseCanvas.width = feedbackContainer.clientWidth;
+              poseCanvas.height = feedbackContainer.clientHeight;
+            }
+          }, 0);
+        }
+      }
+
+      // =========================================
+      // 渲染循环与视角控制实现
+      // =========================================
+
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // 更新全局时间 Uniform
+        globalShaderUniforms.uTime.value = clock.getElapsedTime();
+
+        // 1. 自动旋转
+        const AUTO_ROTATE_SPEED = 0.001;
+        if (currentModel) {
+          currentModel.rotation.y += AUTO_ROTATE_SPEED;
+        }
+
+        // 2. 具身视角控制与反馈
+        if (interactionStarted) {
+          updateVisualFeedback(); // Includes updateEmbodiedFeedbackAesthetics()
+          updateNarrative(globalTension);
+          updateEmbodiedCamera();
+          updateAudioFeedback();
+        }
+
+        controls.update();
+
+        if (composer) {
+          composer.render();
+        }
+      }
+
+      function updateEmbodiedCamera() {
+        const SMOOTHING_FACTOR = 0.05;
+
+        embodiedCameraState.currentRotationX = THREE.MathUtils.lerp(
+          embodiedCameraState.currentRotationX,
+          embodiedCameraState.targetRotationX,
+          SMOOTHING_FACTOR
+        );
+
+        embodiedCameraState.currentDistance = THREE.MathUtils.lerp(
+          embodiedCameraState.currentDistance,
+          embodiedCameraState.targetDistance,
+          SMOOTHING_FACTOR
+        );
+
+        const baseRotation = currentModel ? currentModel.rotation.y : 0;
+        const finalAngle = baseRotation + embodiedCameraState.currentRotationX;
+        const radius = embodiedCameraState.currentDistance;
+
+        camera.position.x = radius * Math.sin(finalAngle);
+        camera.position.z = radius * Math.cos(finalAngle);
+        camera.position.y = 1.5;
+
+        camera.lookAt(controls.target);
+      }
+
+      // =========================================
+      // 状态管理与 UI 流程控制
+      // =========================================
+      function updateStatus(message) {
+        if (startButton) {
+          startButton.textContent = message;
+        }
+      }
+
+      function checkReadiness() {
+        if (isPoseReady && isModelLoaded) {
+          if (isAudioReady) {
+            updateStatus("Start Experience (Click to begin audio)");
+          } else {
+            updateStatus("Loading...");
+          }
+          if (isPoseReady && isModelLoaded) {
+            startButton.disabled = false;
+            return isAudioReady;
+          }
+        } else if (isPoseReady && !isModelLoaded) {
+          updateStatus("System Ready. Please load model via top bar.");
+        }
+        return false;
+      }
+
+      function startExperience() {
+        if (isPoseReady && isModelLoaded) {
+          interactionStarted = true;
+
+          // Handle browser autoplay policy
+          if (audioListener && audioListener.context.state === "suspended") {
+            audioListener.context.resume();
+          }
+
+          if (soundShelter && soundShelter.buffer && !soundShelter.isPlaying)
+            soundShelter.play();
+          if (soundPressure && soundPressure.buffer && !soundPressure.isPlaying)
+            soundPressure.play();
+
+          introOverlay.style.opacity = 0;
+          setTimeout(() => {
+            introOverlay.style.display = "none";
+          }, 1000);
+
+          // Ensure layout is correct on start
+          onWindowResize();
+        }
+      }
+
+      startButton.addEventListener("click", startExperience);
+
+      // New UI function for toggling the view
+      window.toggleFeedbackView = function () {
+        feedbackContainer.style.display =
+          feedbackContainer.style.display === "none" ? "block" : "none";
+        // Ensure canvas/video size is updated when toggled back on
+        if (feedbackContainer.style.display === "block") {
+          onWindowResize();
+        }
+      };
+
+      // =========================================
+      // 初始化
+      // =========================================
+
+      initThreeJS();
+      initPoseDetection();
+      // >>>>> ADD THIS LINE <<<<<
+      loadGLBModel("assets/artifact.glb"); // Load the demo model on startup
+    </script>
+  </body>
+</html>
