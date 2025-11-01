@@ -3,17 +3,33 @@
   <head>
     <title>The Tension of the Second Skin | Zehua Yu</title>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+
     <link
-      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&family=Inter:wght@300;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;600&display=swap"
       rel="stylesheet"
     />
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"
+    ></script>
 
     <script type="importmap">
       {
@@ -39,60 +55,74 @@
         overflow: hidden;
         height: 100vh;
       }
+
       #viewer-container {
         position: relative;
         width: 100%;
         height: 100%;
+        /* Hidden cursor for immersion during the experience */
         cursor: none;
       }
 
-      /* --- UI: 引导与启动屏幕 --- */
+      /* --- UI: 引导与启动屏幕 (Aesthetic Polish) --- */
       #intro-overlay {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0, 0, 0, 0.95);
+        background-color: rgba(0, 0, 0, 0.98); /* Darker background */
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 100;
         transition: opacity 1s ease-out;
+        cursor: auto; /* Ensure cursor is visible here */
       }
       .intro-content {
         text-align: center;
-        max-width: 650px;
+        max-width: 700px;
         padding: 20px;
       }
       .intro-content h1 {
-        font-size: 2.5em;
-        font-weight: 600;
-        margin-bottom: 15px;
+        /* Using Lora for title consistency with narrative */
+        font-family: "Lora", serif;
+        font-size: 3em;
+        font-weight: 700;
+        margin-bottom: 20px;
+        letter-spacing: 0.5px;
       }
       .intro-content p {
         font-size: 1.1em;
-        font-weight: 300;
-        line-height: 1.6;
-        margin-bottom: 25px;
+        font-weight: 300; /* Lighter weight for body text */
+        line-height: 1.7;
+        margin-bottom: 35px;
+        color: #ccc;
       }
       #start-button {
-        padding: 10px 25px;
+        padding: 12px 30px;
         font-size: 1.1em;
+        font-weight: 600;
         cursor: pointer;
         background-color: #fff;
         color: #000;
         border: none;
-        border-radius: 5px;
-        transition: background-color 0.3s;
+        /* Cleaner look: removed border-radius */
+        border-radius: 0px;
+        transition: background-color 0.3s, color 0.3s;
+      }
+      #start-button:hover:not(:disabled) {
+        background-color: #000;
+        color: #fff;
+        outline: 1px solid #fff;
       }
       #start-button:disabled {
-        background-color: #666;
-        color: #aaa;
+        background-color: #444;
+        color: #888;
         cursor: default;
       }
 
-      /* --- UI: 叙事文本层 --- */
+      /* --- UI: 叙事文本层 (Faster Transition) --- */
       #narrative-container {
         position: absolute;
         bottom: 60px;
@@ -109,7 +139,8 @@
         font-size: 1.8em;
         font-style: italic;
         opacity: 0;
-        transition: opacity 2s ease-in-out;
+        /* Faster, smoother transition (0.8s) */
+        transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
         position: absolute;
         width: 100%;
         left: 0;
@@ -117,10 +148,11 @@
         text-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
       }
 
-      /* --- UI: 开发与调试控制 --- */
+      /* --- UI: 开发与调试控制 (Minimalist UI) --- */
       #dev-controls {
         padding: 10px;
-        background-color: rgba(0, 0, 0, 0.5);
+        /* Darker, more subtle background */
+        background-color: rgba(0, 0, 0, 0.8);
         text-align: center;
         z-index: 101;
         position: absolute;
@@ -129,6 +161,27 @@
         width: 100%;
         box-sizing: border-box;
         display: block;
+        font-size: 0.9em;
+        opacity: 0.85;
+        transition: opacity 0.3s;
+        cursor: auto; /* Ensure cursor is visible when hovering controls */
+      }
+      #dev-controls:hover {
+        opacity: 1;
+      }
+      /* Minimalist styling for buttons inside dev-controls */
+      #dev-controls button {
+        background: none;
+        border: 1px solid #aaa;
+        color: #aaa;
+        padding: 5px 10px;
+        cursor: pointer;
+        transition: color 0.3s, border-color 0.3s;
+        border-radius: 0;
+      }
+      #dev-controls button:hover {
+        color: #fff;
+        border-color: #fff;
       }
 
       /* --- UI: Embodied Feedback View (PiP) --- */
@@ -136,11 +189,12 @@
         position: absolute;
         bottom: 40px;
         left: 40px;
-        width: 240px; /* Size suitable for PiP (4:3 aspect ratio) */
-        height: 180px;
-        z-index: 50; /* Above the main scene */
-        background-color: rgba(0, 0, 0, 0.5);
-        display: block; /* Visible by default for portfolio */
+        /* Increased size (360x270) */
+        width: 360px;
+        height: 270px;
+        z-index: 50;
+        background-color: rgba(0, 0, 0, 0.3);
+        display: block;
         overflow: hidden;
         box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -153,8 +207,7 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
-        transform: scaleX(-1); /* Mirrored view for intuitive interaction */
-        /* Smooth transition for CSS filters applied via JS */
+        transform: scaleX(-1);
         transition: filter 0.5s ease-out;
       }
 
@@ -165,10 +218,10 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
-        transform: scaleX(-1); /* Mirrored view for skeleton alignment */
+        transform: scaleX(-1);
       }
 
-      /* Noise/Scanline Overlay (Aesthetic enhancement) */
+      /* Noise/Scanline Overlay */
       #feedback-overlay {
         position: absolute;
         top: 0;
@@ -177,7 +230,6 @@
         height: 100%;
         pointer-events: none;
         z-index: 1;
-        /* Simulating digital scanlines using a repeating gradient */
         background-image: repeating-linear-gradient(
           0deg,
           rgba(0, 0, 0, 0.4) 0px,
@@ -185,9 +237,36 @@
           transparent 1px,
           transparent 3px
         );
-        opacity: 0.5; /* Default opacity, controlled by JS */
+        opacity: 0.5;
         transition: opacity 0.5s ease-out;
       }
+
+      /* >>>>> 新增：瞬时操作说明 (Ephemeral Instructions) <<<<< */
+      #instruction-overlay {
+        position: absolute;
+        bottom: 40px;
+        right: 40px;
+        z-index: 35; /* Below PiP (50) but above main scene */
+        padding: 15px 20px;
+        /* Match the aesthetic of the PiP container */
+        background-color: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #aaa; /* Muted color */
+        font-family: "Inter", sans-serif;
+        font-size: 0.9em;
+        font-weight: 300;
+        line-height: 1.8;
+        text-align: right;
+        pointer-events: none; /* Don't block interactions */
+        opacity: 0; /* Start hidden */
+        /* Slow transition for fade in/out */
+        transition: opacity 1.5s ease-in-out;
+      }
+      #instruction-overlay strong {
+        font-weight: 600;
+        color: #fff; /* Highlight keywords */
+      }
+      /* ------------------------------------------------- */
     </style>
   </head>
   <body>
@@ -206,6 +285,12 @@
         <canvas id="pose-canvas"></canvas>
         <div id="feedback-overlay"></div>
       </div>
+
+      <div id="instruction-overlay">
+        <strong>Crouch / Stand</strong> to adjust Tension<br />
+        <strong>Move Left / Right</strong> to Orbit<br />
+        <strong>Move Closer / Further</strong> to Zoom
+      </div>
     </div>
 
     <div id="intro-overlay">
@@ -213,18 +298,19 @@
         <h1>The Tension of the Second Skin</h1>
         <p>
           An exploration of embodied tension. Requires camera and audio access.
-          <br /><strong>Crouch/Stand</strong> to change tension.
-          <strong>Move Left/Right</strong> to orbit.
-          <strong>Move Closer/Further</strong> to zoom.
+          <br />Please ensure your full body is visible. Instructions will
+          appear briefly.
         </p>
         <button id="start-button" disabled>Initializing...</button>
       </div>
     </div>
 
     <div id="dev-controls">
-      <label for="model-input">Load Local Model (.glb): </label>
+      <label for="model-input" style="margin-right: 10px"
+        >Load Local Model (.glb):
+      </label>
       <input type="file" id="model-input" accept=".glb,.gltf" />
-      <span id="tension-display" style="margin-left: 15px; margin-right: 15px"
+      <span id="tension-display" style="margin-left: 20px; margin-right: 20px"
         >Tension: 0.50</span
       >
       <button onclick="toggleFeedbackView()">Toggle Feedback View</button>
@@ -269,16 +355,14 @@
 
       // Pose Detection and Feedback View variables
       let detector, videoData, videoDisplay, poseCanvas, poseCtx;
-      let feedbackContainer, feedbackOverlay; // Elements for PiP aesthetics
+      let feedbackContainer, feedbackOverlay;
 
       const SCORE_THRESHOLD = 0.5;
       let globalTension = 0.5;
       const tensionDisplay = document.getElementById("tension-display");
 
-      // 音频系统变量
       let audioListener, soundShelter, soundPressure;
 
-      // 具身视角控制
       const embodiedCameraState = {
         targetRotationX: 0,
         targetDistance: 5,
@@ -286,7 +370,6 @@
         currentDistance: 5,
       };
 
-      // 全局 Uniforms
       const globalShaderUniforms = {
         uTension: { value: 0.5 },
         uTime: { value: 0.0 },
@@ -300,20 +383,19 @@
       const introOverlay = document.getElementById("intro-overlay");
       const textShelter = document.getElementById("text-shelter");
       const textPressure = document.getElementById("text-pressure");
+      // 新增: 引用交互指引元素 (注意：这里不需要在全局定义，可以在startExperience中获取)
 
       // =========================================
-      // 视觉反馈定义与更新
+      // 视觉反馈定义与更新 (保持不变)
       // =========================================
 
       let ambientLight, keyLight, fillLight, rimLight;
 
-      // Colors definitions aligned with project themes
       const COLOR_RELAXED_LIGHT = new THREE.Color(0xffebcd); // Warm Amber (Shelter)
       const COLOR_TENSE_LIGHT = new THREE.Color(0xa6c7ff); // Cold Blue (Pressure)
       const COLOR_RELAXED_BG = new THREE.Color(0x1a1a15);
       const COLOR_TENSE_BG = new THREE.Color(0x0a0f1a);
 
-      // Skeleton color mirroring the scene lighting
       let currentSkeletonColor = new THREE.Color();
 
       function updateVisualFeedback() {
@@ -372,33 +454,25 @@
         updateEmbodiedFeedbackAesthetics();
       }
 
-      // >>>>> 新增：具身反馈视图美学更新 <<<<<
+      // 具身反馈视图美学更新
       function updateEmbodiedFeedbackAesthetics() {
         if (!feedbackContainer || !feedbackOverlay || !videoDisplay) return;
 
-        // 1. Update Skeleton Color (Interpolate between the main light colors)
+        // 1. Update Skeleton Color
         currentSkeletonColor.lerpColors(
           COLOR_RELAXED_LIGHT,
           COLOR_TENSE_LIGHT,
           globalTension
         );
 
-        // 2. Color Grading (Using CSS filters on the videoDisplay element)
-        // Goal: Moody, high contrast, and desaturated, especially when tense.
-
-        // Saturation: 60% (Relaxed, subtle warmth) -> 0% (Tense, stark grayscale)
+        // 2. Color Grading (Using CSS filters)
         const saturate = THREE.MathUtils.lerp(0.6, 0.0, globalTension) * 100;
-        // Brightness: 110% (Relaxed) -> 90% (Tense)
         const brightness = THREE.MathUtils.lerp(1.1, 0.9, globalTension) * 100;
-        // Contrast: 110% (Relaxed) -> 150% (Tense)
         const contrast = THREE.MathUtils.lerp(1.1, 1.5, globalTension) * 100;
 
-        // Apply CSS filters to the video element (so the skeleton overlay remains bright)
         videoDisplay.style.filter = `saturate(${saturate}%) brightness(${brightness}%) contrast(${contrast}%)`;
 
         // 3. Noise/Scanline Overlay Opacity
-        // Tension 0.0: 0.3 (Subtle texture)
-        // Tension 1.0: 0.8 (Strong digital interference)
         const overlayOpacity = THREE.MathUtils.lerp(0.3, 0.8, globalTension);
         feedbackOverlay.style.opacity = overlayOpacity;
       }
@@ -432,6 +506,7 @@
           0.0,
           tension
         );
+        // The CSS transition handles the fade timing
         textShelter.style.opacity = THREE.MathUtils.clamp(
           opacityShelter,
           0.0,
@@ -449,6 +524,7 @@
         );
       }
 
+      // (analyzePosture, processPostureData remain the same)
       function analyzePosture(keypoints) {
         const KP = {
           LEFT_SHOULDER: 5,
@@ -545,7 +621,7 @@
       }
 
       // =========================================
-      // 姿态检测模块 (更新为双视频源)
+      // 姿态检测模块
       // =========================================
 
       async function initPoseDetection() {
@@ -558,7 +634,6 @@
           feedbackOverlay = document.getElementById("feedback-overlay");
 
           await setupCamera();
-          // Video playing is handled in setupCamera
           updateStatus("Loading Pose Model...");
           await loadPoseModel();
           poseCanvas = document.getElementById("pose-canvas");
@@ -574,30 +649,30 @@
         }
       }
 
-      // >>>>> 更新：设置双视频源 <<<<<
+      // 设置双视频源
       async function setupCamera() {
-        // videoData is used for the fixed-resolution ML processing
         videoData = document.getElementById("webcam-data-source");
-        // videoDisplay is used for the stylized PiP view
         videoDisplay = document.getElementById("webcam-display");
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error("getUserMedia API not available");
         }
+
+        // Ensure TensorFlow.js is ready (since it was deferred)
+        if (window.tf) {
+          await window.tf.ready();
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          // Request a resolution suitable for ML processing (640x480)
           video: { facingMode: "user", width: 640, height: 480 },
         });
 
-        // Assign the same stream to both video elements
         videoData.srcObject = stream;
         videoDisplay.srcObject = stream;
 
-        // Wait for the data source video to load metadata
         return new Promise((resolve) => {
           videoData.onloadedmetadata = () => {
-            // Ensure both videos start playing
             videoData.play();
             videoDisplay.play();
             resolve(videoData);
@@ -606,6 +681,13 @@
       }
 
       async function loadPoseModel() {
+        // Ensure poseDetection library is available (loaded via defer)
+        if (!window.poseDetection) {
+          console.error("Pose Detection library not loaded yet.");
+          // 'defer' should ensure dependencies are met before module execution.
+          return;
+        }
+
         const detectorConfig = {
           modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
         };
@@ -616,7 +698,6 @@
       }
 
       async function detectPosesLoop() {
-        // Use videoData (the hidden element) for detection
         if (detector && videoData.readyState === 4 && interactionStarted) {
           try {
             const poses = await detector.estimatePoses(videoData, {
@@ -631,15 +712,12 @@
               processPostureData(postureData);
 
               updateTensionDisplay(globalTension);
-              // Aesthetics are updated in the main animate loop via updateVisualFeedback
 
               // 绘制反馈视图
               if (poseCanvas && poseCtx) {
                 poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
 
-                // Only draw if the container is visible
                 if (feedbackContainer.style.display !== "none") {
-                  // Use the stylized drawing function
                   drawEmbodiedSkeleton(keypoints);
                 }
               }
@@ -657,13 +735,12 @@
         tensionDisplay.style.color = currentSkeletonColor.getStyle();
       }
 
-      // >>>>> 更新：艺术化骨骼绘制 <<<<<
+      // 艺术化骨骼绘制
       function drawEmbodiedSkeleton(keypoints) {
         const adjacentPairs = poseDetection.util.getAdjacentPairs(
           poseDetection.SupportedModels.MoveNet
         );
 
-        // Use the dynamically calculated color
         const colorString = currentSkeletonColor.getStyle();
 
         poseCtx.strokeStyle = colorString;
@@ -695,10 +772,11 @@
         for (const keypoint of keypoints) {
           if (keypoint.score > SCORE_THRESHOLD) {
             poseCtx.beginPath();
+            // Increased radius for better visibility
             poseCtx.arc(
               keypoint.x * scaleX,
               keypoint.y * scaleY,
-              3,
+              4,
               0,
               2 * Math.PI
             );
@@ -714,6 +792,7 @@
       // 3D 场景模块 (保持不变)
       // =========================================
 
+      // (initThreeJS, setupLighting, setupPostProcessing, initAudio, handleFileUpload, loadGLBModel, centerAndScaleModel, onWindowResize, animate, updateEmbodiedCamera remain the same)
       function initThreeJS() {
         // 1. 场景与渲染器
         scene = new THREE.Scene();
@@ -868,7 +947,6 @@
         };
 
         // Note: Ensure 'ambient_shelter.mp3' and 'ambient_pressure.mp3' exist.
-        // (Error handling remains the same)
         audioLoader.load(
           "ambient_shelter.mp3",
           function (buffer) {
@@ -911,7 +989,16 @@
         loadGLBModel(url);
       }
 
+      // Updated loadGLBModel with robust error handling
       function loadGLBModel(url) {
+        if (!url) {
+          console.warn("loadGLBModel called without a URL.");
+          if (isPoseReady && !isModelLoaded) {
+            updateStatus("System Ready. Awaiting Artifact...");
+          }
+          return;
+        }
+
         updateStatus("Loading 3D Artifact...");
 
         if (currentModel) {
@@ -1017,8 +1104,17 @@
           },
           undefined,
           function (error) {
-            console.error(error);
-            updateStatus("Model Loading Failed.");
+            console.error("Error loading model from URL:", url, error);
+            // Specific handling if the auto-loaded default model fails
+            if (url === "assets/artifact.glb") {
+              console.warn("Default artifact (assets/artifact.glb) not found.");
+              // Allow user to proceed with manual upload even if default fails
+              if (isPoseReady) {
+                updateStatus("System Ready. Please load model via top bar.");
+              }
+            } else {
+              updateStatus("Model Loading Failed.");
+            }
           }
         );
       }
@@ -1047,7 +1143,7 @@
         controls.update();
       }
 
-      // >>>>> 更新：确保 Canvas 尺寸正确设置 <<<<<
+      // 确保 Canvas 尺寸正确设置
       function onWindowResize() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -1148,20 +1244,22 @@
       function checkReadiness() {
         if (isPoseReady && isModelLoaded) {
           if (isAudioReady) {
-            updateStatus("Start Experience (Click to begin audio)");
+            updateStatus("Start Experience");
           } else {
-            updateStatus("Loading...");
+            updateStatus("Loading Audio...");
           }
           if (isPoseReady && isModelLoaded) {
             startButton.disabled = false;
             return isAudioReady;
           }
         } else if (isPoseReady && !isModelLoaded) {
-          updateStatus("System Ready. Please load model via top bar.");
+          // Updated status message, as we attempt auto-load
+          updateStatus("System Ready. Awaiting Artifact...");
         }
         return false;
       }
 
+      // >>>>> 更新：启动体验并控制说明文字时序 <<<<<
       function startExperience() {
         if (isPoseReady && isModelLoaded) {
           interactionStarted = true;
@@ -1176,20 +1274,40 @@
           if (soundPressure && soundPressure.buffer && !soundPressure.isPlaying)
             soundPressure.play();
 
+          // 淡出介绍
           introOverlay.style.opacity = 0;
+
           setTimeout(() => {
             introOverlay.style.display = "none";
-          }, 1000);
+
+            // 淡入交互指引
+            const instructionOverlay = document.getElementById(
+              "instruction-overlay"
+            );
+            if (instructionOverlay) {
+              // 1. 淡入
+              instructionOverlay.style.opacity = 1;
+
+              // 2. 15秒后自动淡出
+              setTimeout(() => {
+                instructionOverlay.style.opacity = 0;
+              }, 15000);
+            }
+          }, 1000); // 等待介绍淡出 (1s)
 
           // Ensure layout is correct on start
           onWindowResize();
         }
       }
 
-      startButton.addEventListener("click", startExperience);
+      // Check if startButton exists before adding listener (robustness)
+      if (startButton) {
+        startButton.addEventListener("click", startExperience);
+      }
 
       // New UI function for toggling the view
       window.toggleFeedbackView = function () {
+        if (!feedbackContainer) return;
         feedbackContainer.style.display =
           feedbackContainer.style.display === "none" ? "block" : "none";
         // Ensure canvas/video size is updated when toggled back on
@@ -1202,10 +1320,11 @@
       // 初始化
       // =========================================
 
+      // Initialization is triggered when the module executes (which happens after deferred scripts load)
       initThreeJS();
       initPoseDetection();
-      // >>>>> ADD THIS LINE <<<<<
-      loadGLBModel("assets/artifact.glb"); // Load the demo model on startup
+      // 尝试自动加载默认模型。
+      loadGLBModel("assets/artifact.glb");
     </script>
   </body>
 </html>
